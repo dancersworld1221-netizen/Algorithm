@@ -1,3 +1,14 @@
+# This project is an application, not an installable package. Build tools such
+# as Cloudflare Workers Builds run `pip install .` on a root pyproject.toml, so
+# declare "no Python packages" explicitly; otherwise setuptools' auto-discovery
+# trips over backend/, frontend/ and node_modules/.
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = []
+
 [project]
 name = "ai-search-playground"
 version = "0.2.0"

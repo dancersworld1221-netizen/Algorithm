@@ -94,6 +94,22 @@ uv run pywrangler deploy         # requires `wrangler login`
 > end to end in the environment where this audit was done (its network blocked
 > the Pyodide package index). Run `pywrangler dev` once before deploying.
 
+### Cloudflare Workers Builds (Git-connected deploys)
+
+The build runs `npm clean-install` and `pip install .` at the repo root, so the
+root `package.json` and `pyproject.toml` are both kept build-safe (the Python
+project declares no packages; it only lists dependencies). Two settings are
+needed in the dashboard:
+
+- **Build command:** `npm run build` (installs and builds `frontend/`, which
+  produces the `frontend/dist` assets that `wrangler.jsonc` serves; the
+  directory is gitignored, so it must be built in CI).
+- **Deploy command:** Python Workers with dependencies are normally deployed
+  with `uv run pywrangler deploy`. A plain `npx wrangler deploy` will not
+  vendor `fastapi`. Whether `uv` is available in the build image is not
+  something this repo can verify; if it is not, install it in the build
+  command first (`pip install uv && npm run build`).
+
 ## Execution limits
 
 Every search is bounded by max expanded nodes, max generated nodes, max events,
