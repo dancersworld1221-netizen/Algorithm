@@ -27,6 +27,10 @@ dev = [
   "httpx",
 ]
 
+[tool.uv]
+# Dependencies only; there is no package to build or install.
+package = false
+
 [tool.pytest.ini_options]
-testpaths = ["backend/tests"]
+testpaths = ["tests"]
 pythonpath = ["backend"]

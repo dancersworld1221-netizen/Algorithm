@@ -34,7 +34,8 @@ ai-search-playground/
 │   │   ├── algorithms/         # 11 independent search implementations
 │   │   └── api/                # FastAPI routes, schemas, service, limits,
 │   │                           #   static-asset proxy for the SPA
-│   └── tests/                  # pytest suite (230+ tests)
+├── tests/                      # pytest suite (230+ tests; kept outside backend/
+│                               #   because wrangler uploads every .py beside main.py)
 ├── frontend/
 │   ├── package.json
 │   ├── vite.config.ts
@@ -96,19 +97,27 @@ uv run pywrangler deploy         # requires `wrangler login`
 
 ### Cloudflare Workers Builds (Git-connected deploys)
 
-The build runs `npm clean-install` and `pip install .` at the repo root, so the
-root `package.json` and `pyproject.toml` are both kept build-safe (the Python
-project declares no packages; it only lists dependencies). Two settings are
-needed in the dashboard:
+Set these in the dashboard (Workers & Pages -> your Worker -> Settings -> Build):
 
-- **Build command:** `npm run build` (installs and builds `frontend/`, which
-  produces the `frontend/dist` assets that `wrangler.jsonc` serves; the
-  directory is gitignored, so it must be built in CI).
-- **Deploy command:** Python Workers with dependencies are normally deployed
-  with `uv run pywrangler deploy`. A plain `npx wrangler deploy` will not
-  vendor `fastapi`. Whether `uv` is available in the build image is not
-  something this repo can verify; if it is not, install it in the build
-  command first (`pip install uv && npm run build`).
+| Setting | Value |
+|---|---|
+| Build command | `pip install uv && npm run build` |
+| Deploy command | `uv run pywrangler deploy` |
+
+Why not the default `npx wrangler deploy`? Plain wrangler does not vendor Python
+dependencies, so the Worker fails validation with
+`ModuleNotFoundError: No module named 'workers'` (and would fail on `fastapi`
+next). `pywrangler` installs `workers-py`, vendors `fastapi`/`pydantic` for
+Pyodide, then calls wrangler. It needs `uv >= 0.13.4`, hence `pip install uv`.
+
+The build also runs `npm clean-install` and `pip install .` at the repo root
+automatically, so the root `package.json` and `pyproject.toml` are kept
+build-safe (the Python project declares no packages; it only lists
+dependencies). `npm run build` installs and builds `frontend/`, producing the
+`frontend/dist` assets (gitignored, so they must be built in CI).
+
+The Worker name in `wrangler.jsonc` (`algorithm`) must match the Worker the
+build is connected to, or Workers Builds opens a rename pull request.
 
 ## Execution limits
 

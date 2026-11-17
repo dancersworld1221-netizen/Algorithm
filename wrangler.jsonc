@@ -3,7 +3,7 @@
 // proxies every other request to the built React app (Workers Static Assets).
 {
   "$schema": "https://schemas.cloudflare.com/workers/v4/configuration.json",
-  "name": "ai-search-playground",
+  "name": "algorithm",
   "main": "backend/main.py",
   // Set to a recent date when you deploy.
   "compatibility_date": "2026-11-01",

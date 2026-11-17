@@ -60,7 +60,8 @@ documented pattern: `Default = asgi.entrypoint(app)`. With
 `assets.run_worker_first = true` every request reaches FastAPI first, so
 `/api/*` always wins; a final catch-all route proxies everything else to the
 `ASSETS` binding, falling back to `index.html` for client-side routes.
-`pyproject.toml` lives at the repo root next to `wrangler.jsonc`, as
+Tests live in the top-level `tests/` (not `backend/tests/`) so wrangler does
+not upload them with the Worker. `pyproject.toml` lives at the repo root next to `wrangler.jsonc`, as
 `pywrangler` expects.
 
 ## Running locally
@@ -81,3 +82,9 @@ app and the asset proxy are covered by the pytest suite without the runtime.
 Native CPython takes roughly 1-30 ms per search on the default grid, before
 Pyodide overhead. The Free plan's 10 ms CPU limit is likely too small; use the
 Paid plan or lower the `SEARCH_*` limits in `vars`.
+
+## Git-connected deploys
+
+Build command `pip install uv && npm run build`; deploy command
+`uv run pywrangler deploy`. `npx wrangler deploy` alone fails with
+`No module named 'workers'` because it does not vendor Python packages.
