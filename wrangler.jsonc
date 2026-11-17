@@ -9,6 +9,13 @@
   "compatibility_date": "2026-11-01",
   "compatibility_flags": ["python_workers"],
 
+  // Plain `wrangler deploy` does not install Python packages, so the Worker
+  // fails validation with "No module named 'workers'". `pywrangler deploy` runs
+  // this same sync first; running it here makes either command work.
+  "build": {
+    "command": "uv run pywrangler sync"
+  },
+
   "assets": {
     "directory": "./frontend/dist",
     "binding": "ASSETS",

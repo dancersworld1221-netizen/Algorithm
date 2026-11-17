@@ -97,18 +97,22 @@ uv run pywrangler deploy         # requires `wrangler login`
 
 ### Cloudflare Workers Builds (Git-connected deploys)
 
-Set these in the dashboard (Workers & Pages -> your Worker -> Settings -> Build):
+Dashboard (Workers & Pages -> your Worker -> Settings -> Build):
 
 | Setting | Value |
 |---|---|
-| Build command | `pip install uv && npm run build` |
-| Deploy command | `uv run pywrangler deploy` |
+| Build command | `npm run build` |
+| Deploy command | `npx wrangler deploy` (the default) |
 
-Why not the default `npx wrangler deploy`? Plain wrangler does not vendor Python
-dependencies, so the Worker fails validation with
-`ModuleNotFoundError: No module named 'workers'` (and would fail on `fastapi`
-next). `pywrangler` installs `workers-py`, vendors `fastapi`/`pydantic` for
-Pyodide, then calls wrangler. It needs `uv >= 0.13.4`, hence `pip install uv`.
+Plain wrangler does not vendor Python dependencies, so on its own it fails
+validation with `ModuleNotFoundError: No module named 'workers'` (and would fail
+on `fastapi` next). `pywrangler deploy` is `pywrangler sync` (which vendors
+`workers-py`, `fastapi` and `pydantic` into `python_modules/`) followed by
+`wrangler deploy`. `wrangler.jsonc` therefore sets
+`build.command = "uv run pywrangler sync"`, so the default deploy command works
+unchanged. Using `uv run pywrangler deploy` as the deploy command also works
+(the second sync is a no-op). Workers Builds already runs `uv sync` because
+of `[tool.uv]` in `pyproject.toml`, which is why `uv` is available.
 
 The build also runs `npm clean-install` and `pip install .` at the repo root
 automatically, so the root `package.json` and `pyproject.toml` are kept

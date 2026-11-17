@@ -85,6 +85,8 @@ Paid plan or lower the `SEARCH_*` limits in `vars`.
 
 ## Git-connected deploys
 
-Build command `pip install uv && npm run build`; deploy command
-`uv run pywrangler deploy`. `npx wrangler deploy` alone fails with
-`No module named 'workers'` because it does not vendor Python packages.
+Build command `npm run build`, deploy command `npx wrangler deploy`.
+`wrangler.jsonc` sets `build.command = "uv run pywrangler sync"`, which vendors
+the Python packages into `python_modules/` before wrangler uploads the Worker
+(`pywrangler deploy` does exactly this sync, then calls `wrangler deploy`).
+Without it the deploy fails with `No module named 'workers'`.
