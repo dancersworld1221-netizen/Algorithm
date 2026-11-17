@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Build outputs
+frontend/dist/
+backend/dist/
+
+# Environment / secrets
+.dev.vars
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Cloudflare
+.wrangler/
+
+# OS
+Thumbs.db
+
+# Local tooling
+.pytest_cache/
+.venv-workers/
+python_modules/
