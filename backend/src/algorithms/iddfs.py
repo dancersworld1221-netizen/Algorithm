@@ -34,10 +34,9 @@ class IDDFS(BaseSearch):
         self,
         problem: SearchProblem,
         budget: Optional[SearchBudget] = None,
-        env=None,
         max_depth: int = 100,
     ) -> None:
-        super().__init__(problem, budget=budget, env=env)
+        super().__init__(problem, budget=budget)
         if max_depth < 0:
             raise ValueError("max_depth must be >= 0")
         self.max_depth = max_depth
@@ -98,11 +97,7 @@ class IDDFS(BaseSearch):
 
         if last_iteration_cutoff:
             # Ran out of allowed depths while states were still unexplored.
-            self._termination_reason = TerminationReason.LIMIT_REACHED
-            self._limit_reason = "max_depth"
-            self._emit(EventType.SEARCH_FAILED, start, depth=0,
-                       metadata={"reason": "max_depth_exhausted",
-                                 "max_depth": self.max_depth})
+            self._mark_limit("max_depth", max_depth=self.max_depth)
         else:
             self._termination_reason = TerminationReason.NO_PATH
             self._emit(EventType.SEARCH_FAILED, start, depth=0,
@@ -122,9 +117,10 @@ class IDDFS(BaseSearch):
         stack: List[DepthFrame] = [
             DepthFrame(start, 0, 0.0, iter(problem.successors(start)))
         ]
-        self._nodes_generated += 1
-        self._max_frontier_size = max(self._max_frontier_size, 1)
+        self._count_generation()
+        self._note_frontier(1)
         cutoff_occurred = False
+        cut_marked: set = set()
         nodes_expanded = 0
 
         while stack:
@@ -136,7 +132,7 @@ class IDDFS(BaseSearch):
             if not frame.expanded:
                 frame.expanded = True
                 nodes_expanded += 1
-                self._nodes_explored += 1
+                self._count_expansion()
                 self._emit(EventType.NODE_EXPANDED, current,
                            parent=came_from[current], depth=depth, g=g, h=h,
                            f=g + h, metadata={"iteration_limit": limit})
@@ -154,6 +150,9 @@ class IDDFS(BaseSearch):
                 if next_depth > limit:
                     if nxt not in best_depth:
                         cutoff_occurred = True
+                        if nxt in cut_marked:
+                            continue  # one marker per cell is enough
+                        cut_marked.add(nxt)
                         self._emit(EventType.CUTOFF, nxt, parent=current,
                                    depth=next_depth, g=ng, h=problem.h(nxt),
                                    f=ng + problem.h(nxt),
@@ -164,7 +163,7 @@ class IDDFS(BaseSearch):
                     continue
                 best_depth[nxt] = next_depth
                 came_from[nxt] = current
-                self._nodes_generated += 1
+                self._count_generation()
                 nh = problem.h(nxt)
                 self._emit(EventType.NODE_DISCOVERED, nxt, parent=current,
                            depth=next_depth, g=ng, h=nh, f=ng + nh,

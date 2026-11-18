@@ -130,8 +130,11 @@ grid size and a timeout. The server limits live in `wrangler.jsonc` `vars`, are
 read per request (`backend/src/api/limits.py`) and are reported at
 `GET /api/config`. A request may ask for a *lower* budget, never a higher one.
 A search that hits a limit returns `termination_reason: "limit_reached"` plus a
-`limit_reason` such as `max_events` or `depth_limit`, and a final
+`limit_reason` such as `max_expanded_nodes` or `depth_limit`, and a final
 `EXECUTION_LIMIT_REACHED` event; it is never reported as a natural failure.
+`max_events` is different: it caps only the size of the returned trace. When
+reached, the response sets `trace_truncated` and the search still finishes with
+its real result.
 
 Default grid: 20 columns x 15 rows (maximum 60 x 40).
 
@@ -145,10 +148,17 @@ and plan on the Paid plan (or lower the limits in `vars`). Measure under
 
 ### Algorithms that can hit a budget by design
 
-Iterative deepening and RBFS repeat work, so on grids with walls they can
-exhaust the event budget before finishing (IDDFS needs one pass per depth level;
-RBFS thrashes on tied f-values). That is reported as `limit_reached`, not a
-bug. IDA* keeps a per-iteration table of the cheapest g seen per cell to avoid
+Iterative deepening and RBFS repeat work, so on grids with walls they can use up
+the expanded-node budget before finishing. Measured on 280 random solvable
+20x15 grids with 10-30% walls and the default server budget: BFS, DFS, UCS, A*,
+Greedy, IDDFS and IDA* solved 100%; RBFS 94% (it keeps no table of visited
+cells, so it re-walks tied routes; the rest stop with
+`limit_reason: "max_expanded_nodes"`). DLS stops at its depth limit by design
+(default limit = start-to-goal Manhattan distance, so a wall detour is a
+cutoff). Hill climbing stops at local optima and beam search can prune the only
+route; both are incomplete by definition.
+
+IDA* keeps a per-iteration table of the cheapest g seen per cell to avoid
 re-walking equal-cost grid routes, which costs O(cells) memory instead of the
 textbook O(path length).
 
@@ -160,13 +170,27 @@ execution traces are kept in memory. No cloud storage is required.
 
 ## Testing
 
-- Backend: `python -m pytest` from the repo root. Includes differential tests of
-  every complete/optimal algorithm against a reference Dijkstra on random grids
-  (4/8-way, weighted terrain, obstacles), regression tests for each bug found
-  in the audit, budget and recursion-depth tests, API validation/error-shape
-  tests, and the static-asset proxy.
+- Backend: `python -m pytest` from the repo root (476 tests):
+  - differential tests of every complete/optimal algorithm against a reference
+    Dijkstra on random grids (4/8-way, weighted terrain, walls);
+  - property tests of the algorithms themselves (`tests/test_validation.py`):
+    admissible + consistent heuristic, the expansion order that defines each
+    algorithm (UCS by g, A* by f, BFS by level), event traces that agree with
+    what the search did, exact budgets, edge cases for every algorithm;
+  - regression tests for each bug found in the audits, API validation and
+    error-shape tests, and the static-asset proxy.
 - Frontend: `cd frontend && npm test` (vitest: cell parsing, animation
   timeline, grid editing, persistence, API client) and `npm run typecheck`.
+- UI end to end (needs a running backend; skipped otherwise):
+
+  ```bash
+  python -m uvicorn src.api.app:app --app-dir backend --port 8787 &
+  cd frontend && E2E_API_URL=http://127.0.0.1:8787 npm run test:e2e
+  ```
+
+  It mounts the real React app in jsdom against the real API and checks, for
+  example, that the number of path-coloured canvas cells equals the returned
+  path length.
 
 ## Docs
 

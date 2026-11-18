@@ -5,7 +5,6 @@ Defines the canonical interfaces that every algorithm implements against:
 - Successor generation (action + transition cost)
 - Goal testing
 - Heuristic functions
-- Depth / cost limits
 
 The grid environment models 4-way and 8-way movement with normal, difficult,
 and high-cost terrain, plus an explicit corner-cutting policy.
@@ -40,8 +39,6 @@ class TerminationReason(Enum):
     SUCCESS = "success"
     NO_PATH = "no_path"
     LIMIT_REACHED = "limit_reached"
-    INTERRUPTED = "interrupted"
-    INVALID_CONFIG = "invalid_config"
 
 
 class EventType(str, Enum):
@@ -127,6 +124,9 @@ class SearchResult:
     # Why a LIMIT_REACHED result stopped (e.g. "max_expanded_nodes", "timeout",
     # "depth_limit"). None for every other termination reason.
     limit_reason: Optional[str] = None
+    # True when the event trace hit ``max_events`` and later events were
+    # dropped. The search itself still ran to its real conclusion.
+    trace_truncated: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -142,6 +142,7 @@ class SearchResult:
             "termination_reason": self.termination_reason.value,
             "algorithm": self.algorithm,
             "limit_reason": self.limit_reason,
+            "trace_truncated": self.trace_truncated,
         }
 
 
@@ -168,8 +169,6 @@ class SearchProblem:
     successors: Successor
     goal_test: GoalTest
     heuristic: Optional[Heuristic] = None
-    max_depth: Optional[int] = None
-    max_cost: Optional[float] = None
 
     def is_goal(self, state: Cell) -> bool:
         return self.goal_test(state)

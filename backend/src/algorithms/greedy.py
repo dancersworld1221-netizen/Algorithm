@@ -19,7 +19,7 @@ from ..core.problem import (
     SearchProblem,
     TerminationReason,
 )
-from .base import BaseSearch, SearchBudget, reconstruct_path
+from .base import BaseSearch, SearchBudget, reconstruct_path, COST_EPS
 
 
 class GreedyBestFirst(BaseSearch):
@@ -68,7 +68,11 @@ class GreedyBestFirst(BaseSearch):
             if g > g_score.get(current, float("inf")):
                 continue
 
-            self._nodes_explored += 1
+            if current in closed:
+                continue
+            closed.add(current)
+
+            self._count_expansion()
             self._search_depth = max(self._search_depth, depth)
 
             self._emit(EventType.NODE_REMOVED_FROM_FRONTIER, current,
@@ -79,10 +83,6 @@ class GreedyBestFirst(BaseSearch):
                        parent=came_from.get(current), depth=depth, g=g,
                        h=problem.h(current), f=problem.h(current),
                        metadata={"note": "greedy_priority_is_h"})
-
-            if current in closed:
-                continue
-            closed.add(current)
 
             if problem.is_goal(current):
                 self._termination_reason = TerminationReason.SUCCESS
@@ -103,22 +103,22 @@ class GreedyBestFirst(BaseSearch):
                 tentative_g = g + action.cost
                 # Greedy only updates if this is a strictly better known route;
                 # priority remains h(n) regardless of g.
-                if tentative_g < g_score.get(nxt, float("inf")):
+                if tentative_g < g_score.get(nxt, float("inf")) - COST_EPS:
                     came_from[nxt] = current
                     g_score[nxt] = tentative_g
                     depth_of[nxt] = depth + 1
                     h = problem.h(nxt)
-                    self._nodes_generated += 1
-                    if nxt not in generated:
+                    self._count_generation()
+                    rediscovered = nxt in generated
+                    added_meta = {"action": action.label}
+                    if rediscovered:
+                        added_meta["note"] = "cheaper_route_found"
+                    if not rediscovered:
                         generated.add(nxt)
                         self._emit(EventType.NODE_DISCOVERED, nxt,
                                    parent=current, depth=depth + 1,
                                    g=tentative_g, h=h, f=h,
                                    metadata={"action": action.label})
-                    else:
-                        self._emit(EventType.NODE_PRUNED, nxt, parent=current,
-                                   depth=depth + 1, g=tentative_g, h=h, f=h,
-                                   metadata={"reason": "cheaper_route_found"})
                     heapq.heappush(heap, (h, counter, nxt, depth + 1,
                                           tentative_g))
                     counter += 1
@@ -128,7 +128,7 @@ class GreedyBestFirst(BaseSearch):
                     self._emit(EventType.NODE_ADDED_TO_FRONTIER, nxt,
                                parent=current, depth=depth + 1, g=tentative_g,
                                h=h, f=h,
-                               metadata={"action": action.label})
+                               metadata=added_meta)
 
         self._emit(EventType.SEARCH_FAILED, start, depth=0,
                    metadata={"reason": "frontier exhausted"})

@@ -47,6 +47,14 @@ Notes:
 - `dls_limit: null` means *automatic*: the start-to-goal Manhattan distance.
 - `iddfs_max_depth` is clamped to `rows * cols`.
 - The `max_*` / `timeout_ms` fields may only *lower* the server's budget.
+  `max_expanded_nodes`, `max_generated_nodes` and `timeout_ms` bound the
+  search itself. `max_events` bounds only the size of the returned trace: when
+  it is reached, later events are dropped, `trace_truncated` is `true`, and the
+  search still runs to its real outcome. The concluding event
+  (`PATH_FOUND`, `SEARCH_FAILED` or `EXECUTION_LIMIT_REACHED`) is always kept.
+- `movement: "eight_way"` with `corner_cutting: false` forbids a diagonal when
+  either side cell is a wall; with `true` it may graze one wall corner but never
+  squeeze between two walls.
 - Start/goal must be in bounds and not on an obstacle, and obstacles/terrain
   must be in bounds; otherwise the response is a 400 with a readable message.
 
@@ -69,7 +77,8 @@ Notes:
     ],
     "termination_reason": "success",
     "algorithm": "astar",
-    "limit_reason": null
+    "limit_reason": null,
+    "trace_truncated": false
   }
 }
 ```
@@ -80,7 +89,7 @@ Notes:
 in the enum but are not currently produced.)
 
 When `limit_reached`, `limit_reason` says why: `max_expanded_nodes`,
-`max_generated_nodes`, `max_events`, `timeout`, `depth_limit` (DLS cutoff),
+`max_generated_nodes`, `timeout`, `depth_limit` (DLS cutoff),
 `max_depth` (IDDFS ran out of depths) or `max_recursion_depth`. The trace then
 ends with an `EXECUTION_LIMIT_REACHED` event. A budget interruption is never
 reported as a natural failure.

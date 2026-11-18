@@ -183,6 +183,8 @@ def run_comparison(req: ComparisonRunRequest,
                     for t in req.terrain],
     }
     shared = req.model_dump(exclude={"algorithms"})
+    # A comparison only needs the statistics, not the animation trace.
+    shared["max_events"] = 1
 
     results: list[ComparisonAlgorithmResult] = []
     for aid in dict.fromkeys(req.algorithms):  # de-duplicate, keep order

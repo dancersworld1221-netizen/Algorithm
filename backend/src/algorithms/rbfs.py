@@ -37,9 +37,8 @@ class RBFS(BaseSearch):
         self,
         problem: SearchProblem,
         budget: Optional[SearchBudget] = None,
-        env=None,
     ) -> None:
-        super().__init__(problem, budget=budget, env=env)
+        super().__init__(problem, budget=budget)
 
     def _search(self) -> None:
         problem = self.problem
@@ -61,6 +60,8 @@ class RBFS(BaseSearch):
         self._emit(EventType.SEARCH_STARTED, start, depth=0, g=0.0, h=h0,
                    f=h0)
         self._nodes_generated = 1
+        self._stored = 0
+        self._note_frontier(1)
 
         found, _ = self._rbfs(start, 0.0, h0, math.inf, [start], {start})
 
@@ -97,7 +98,7 @@ class RBFS(BaseSearch):
         h = problem.h(node)
 
         self._check_budget()
-        self._nodes_explored += 1
+        self._count_expansion()
         self._search_depth = max(self._search_depth, depth)
         self._emit(EventType.NODE_EXPANDED, node, parent=parent, depth=depth,
                    g=g, h=h, f=f, metadata={"f_limit": f_limit})
@@ -108,6 +109,9 @@ class RBFS(BaseSearch):
             self._search_depth = depth
             return True, f
 
+        # Memory actually held by this frame: the node plus its child list.
+        self._stored += 1
+
         children: List[Dict] = []
         for nxt, action in problem.successors(node):
             if nxt in on_path:
@@ -117,13 +121,36 @@ class RBFS(BaseSearch):
             nh = problem.h(nxt)
             # Backed-up value: a child is never better than its parent's f.
             child_f = max(f, ng + nh)
-            self._nodes_generated += 1
+            self._count_generation()
             children.append({"node": nxt, "action": action, "g": ng,
                              "h": nh, "f": child_f})
             self._emit(EventType.NODE_DISCOVERED, nxt, parent=node,
                        depth=depth + 1, g=ng, h=nh, f=child_f,
                        metadata={"action": action.label, "f_limit": f_limit})
 
+        self._stored += len(children)
+        self._note_frontier(self._stored)
+        held = 1 + len(children)
+        try:
+            return self._best_first_loop(node, g, f, f_limit, depth, parent,
+                                         h, children, path, on_path)
+        finally:
+            self._stored -= held
+
+    def _best_first_loop(
+        self,
+        node: Cell,
+        g: float,
+        f: float,
+        f_limit: float,
+        depth: int,
+        parent: Optional[Cell],
+        h: float,
+        children: List[Dict],
+        path: List[Cell],
+        on_path: Set[Cell],
+    ) -> Tuple[bool, float]:
+        """Repeatedly recurse into the best child until it exceeds f_limit."""
         if not children:
             return False, math.inf
 

@@ -192,7 +192,7 @@ const ALGORITHM_DOCS: Record<AlgorithmId, DocAlgo> = {
   },
   greedy: {
     id: "greedy", name: "Greedy Best-First Search", abbreviation: "GBFS",
-    description: "Expands the node with the lowest heuristic h(n) only — ignores path cost. Fast but neither complete nor optimal.",
+    description: "Expands the node with the lowest heuristic h(n) only — ignores path cost. Fast but not optimal. The textbook tree-search version can loop forever on graphs with cycles; this playground uses the graph-search version (an expanded set), which is complete on a finite grid.",
     data_structure: "min-priority queue (by h)",
     optimal: "No",
     complete: "No",
@@ -211,10 +211,10 @@ const ALGORITHM_DOCS: Record<AlgorithmId, DocAlgo> = {
   return failure`,
     python_source: `import heapq\n\ndef greedy(start, goal, successors, heuristic):\n    pq = [(heuristic(start), start)]\n    visited = {start}\n    parent = {start: None}\n    while pq:\n        _, current = heapq.heappop(pq)\n        if current == goal:\n            return reconstruct(parent, goal)\n        for neighbor, _ in successors(current):\n            if neighbor not in visited:\n                visited.add(neighbor)\n                parent[neighbor] = current\n                heapq.heappush(pq, (heuristic(neighbor), neighbor))\n    return None`,
     complexity: { time: "O(E log V)", space: "O(V)" },
-    completeness: "Not complete — can get stuck or miss the goal.",
+    completeness: "Tree search: not complete (can loop). Graph search with a closed set, as used here: complete on finite graphs.",
     optimality: "Not optimal — greedily follows the heuristic, ignoring cost.",
     advantages: ["Often finds a path quickly", "Good heuristic-directed exploration", "Simple"],
-    disadvantages: ["Not optimal", "Not complete", "Can be misled by local heuristic"],
+    disadvantages: ["Not optimal", "Tree-search form can loop on cycles", "Can be misled by local heuristic"],
     examples: ["Quick path approximation", "Heuristic-guided exploration"],
   },
   ida_star: {

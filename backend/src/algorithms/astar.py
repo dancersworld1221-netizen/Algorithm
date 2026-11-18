@@ -22,7 +22,7 @@ from ..core.problem import (
     SearchProblem,
     TerminationReason,
 )
-from .base import BaseSearch, SearchBudget, reconstruct_path
+from .base import BaseSearch, SearchBudget, reconstruct_path, COST_EPS
 
 
 class Astar(BaseSearch):
@@ -71,7 +71,7 @@ class Astar(BaseSearch):
             if g > g_score.get(current, float("inf")):
                 continue
 
-            self._nodes_explored += 1
+            self._count_expansion()
             self._search_depth = max(self._search_depth, depth)
 
             self._emit(EventType.NODE_REMOVED_FROM_FRONTIER, current,
@@ -98,24 +98,23 @@ class Astar(BaseSearch):
             for nxt, action in problem.successors(current):
                 self._check_budget()
                 tentative_g = g + action.cost
-                if tentative_g < g_score.get(nxt, float("inf")):
+                if tentative_g < g_score.get(nxt, float("inf")) - COST_EPS:
                     came_from[nxt] = current
                     g_score[nxt] = tentative_g
                     depth_of[nxt] = depth + 1
                     h = problem.h(nxt)
-                    self._nodes_generated += 1
-                    if nxt not in generated:
+                    self._count_generation()
+                    rediscovered = nxt in generated
+                    added_meta = {"action": action.label}
+                    if rediscovered:
+                        added_meta["note"] = "cheaper_route_found"
+                    if not rediscovered:
                         generated.add(nxt)
                         self._emit(EventType.NODE_DISCOVERED, nxt,
                                    parent=current, depth=depth + 1,
                                    g=tentative_g, h=h,
                                    f=tentative_g + h,
                                    metadata={"action": action.label})
-                    else:
-                        self._emit(EventType.NODE_PRUNED, nxt, parent=current,
-                                   depth=depth + 1, g=tentative_g, h=h,
-                                   f=tentative_g + h,
-                                   metadata={"reason": "cheaper_route_found"})
                     # Ties on f are broken toward the smaller h (the node
                     # closest to the goal), then FIFO.
                     heapq.heappush(heap, (tentative_g + h, h, counter, nxt,
@@ -127,7 +126,7 @@ class Astar(BaseSearch):
                     self._emit(EventType.NODE_ADDED_TO_FRONTIER, nxt,
                                parent=current, depth=depth + 1,
                                g=tentative_g, h=h, f=tentative_g + h,
-                               metadata={"action": action.label})
+                               metadata=added_meta)
 
         self._emit(EventType.SEARCH_FAILED, start, depth=0,
                    metadata={"reason": "frontier exhausted"})

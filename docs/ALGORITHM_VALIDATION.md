@@ -37,7 +37,9 @@ Every successful path is validated:
 2. Ends at the goal cell.
 3. Every adjacent pair is a legal transition under configured movement rules.
 4. No blocked (obstacle) cells.
-5. Valid diagonal movement (corner-cutting respected when disabled).
+5. Valid diagonal movement: with corner cutting off a diagonal needs both side
+   cells free; with it on, one wall corner may be grazed but the agent never
+   squeezes between two walls that touch diagonally.
 6. Recomputed cumulative cost equals reported `path_cost`.
 
 ## DLS cutoff semantics
@@ -75,9 +77,30 @@ optimal in steps on unit-cost 4-way grids.
 
 ## Known limits (by design)
 
-- IDDFS and RBFS repeat work and can exhaust the event budget on grids with
-  walls; this is reported as `limit_reached` with a `limit_reason`.
+- IDDFS and RBFS repeat work. On the default 20x15 grid with 10-30% walls
+  IDDFS solves every map within the default budget; RBFS stops on the
+  expanded-node budget for roughly 6% of them (it re-walks tied routes because
+  it keeps no table of visited cells). That is reported as `limit_reached` with
+  `limit_reason: "max_expanded_nodes"`, never as a failure to find a path.
+- `max_events` only truncates the recorded trace (`trace_truncated`); it never
+  changes a search's outcome.
 - Python's recursion limit is raised temporarily for IDA* and RBFS (restored
   afterwards); exhaustion is reported as `max_recursion_depth`.
 - Unexpected exceptions are never converted into a search result: they surface
   as a 500 `internal_error`.
+
+## What the property tests check
+
+`tests/test_validation.py` goes beyond "found a path":
+
+- the heuristic is admissible and consistent on random weighted 4/8-way grids;
+- UCS expands in non-decreasing g, BFS level by level, A* in non-decreasing f
+  and never expands a node with f above the optimal cost, and never more nodes
+  than UCS (+1); IDA* never expands a node above its threshold;
+- every event agrees with the search: g values equal parent g + step cost, h
+  equals the heuristic, nodes are discovered before they are expanded, and the
+  counters equal the events;
+- every trace ends with the event that matches its outcome;
+- budgets are exact (a budget of N allows exactly N expansions/generations);
+- cost comparisons use a 1e-9 tolerance so sums of sqrt(2) cannot look like a
+  cheaper route and cause a node to be expanded twice.

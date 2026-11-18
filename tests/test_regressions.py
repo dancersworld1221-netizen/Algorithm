@@ -61,11 +61,14 @@ def test_complete_algorithms_agree_with_reference(seed):
 @pytest.mark.parametrize("seed", range(40))
 def test_bfs_and_iddfs_optimal_in_steps_on_unit_grids(seed):
     rng = random.Random(1000 + seed)
-    problem = random_problem(rng, weighted=False,
-                             movement=MovementMode.FOUR_WAY)
-    truth = reference_cost(problem)
-    if truth is None:
-        pytest.skip("unreachable")
+    for _ in range(100):  # draw until the goal is reachable
+        problem = random_problem(rng, weighted=False,
+                                 movement=MovementMode.FOUR_WAY)
+        truth = reference_cost(problem)
+        if truth is not None:
+            break
+    else:
+        pytest.fail("no solvable problem generated")
     assert run("bfs", problem).path_cost == pytest.approx(truth)
     assert run("iddfs", problem, max_depth=200).path_cost == pytest.approx(truth)
 
@@ -170,18 +173,43 @@ def test_expanded_node_budget_is_enforced(aid):
     result = run(aid, open_grid(), budget=budget, **kw)
     assert result.termination_reason == TerminationReason.LIMIT_REACHED
     assert result.limit_reason == "max_expanded_nodes"
-    assert result.nodes_explored <= 26
+    assert result.nodes_explored == 25  # a budget of N allows exactly N
     assert etypes(result, "EXECUTION_LIMIT_REACHED")
 
 
-def test_event_budget_reports_limit_and_still_emits_terminal_event():
+def test_event_cap_truncates_the_trace_but_not_the_search():
     budget = SearchBudget(max_events=50, max_expanded_nodes=10**6,
                           max_generated_nodes=10**6, timeout_ms=60000)
     result = run("bfs", open_grid(), budget=budget)
-    assert result.limit_reason == "max_events"
-    assert result.events[-1].type == EventType.EXECUTION_LIMIT_REACHED
+    assert result.found and result.limit_reason is None
+    assert result.termination_reason == TerminationReason.SUCCESS
+    assert result.trace_truncated is True
+    # 50 recorded events plus the concluding PATH_FOUND.
+    assert len(result.events) == 51
+    assert result.events[-1].type == EventType.PATH_FOUND
     seqs = [e.seq for e in result.events]
     assert seqs == list(range(1, len(seqs) + 1))
+
+
+@pytest.mark.parametrize("aid", ["bfs", "dfs", "ucs", "astar", "greedy",
+                                 "ida_star", "rbfs", "beam_search",
+                                 "hill_climbing"])
+def test_event_cap_never_changes_the_outcome(aid):
+    rng = random.Random(3)
+    from tests.conftest import random_problem
+    problem = random_problem(rng, weighted=True)
+    full = run(aid, problem)
+    capped = run(aid, problem, budget=SearchBudget(max_events=5))
+    assert capped.trace_truncated or len(full.events) <= 5 + 1
+    for field in ("found", "path", "path_cost", "nodes_explored",
+                  "nodes_generated", "termination_reason", "limit_reason"):
+        assert getattr(capped, field) == getattr(full, field), field
+
+
+def test_an_untruncated_trace_is_not_flagged():
+    problem = make_problem(GridSpec(rows=3, cols=3, start=Cell(0, 0),
+                                    goal=Cell(2, 2), obstacles=[]))
+    assert run("bfs", problem).trace_truncated is False
 
 
 def test_unexpected_exceptions_are_not_swallowed():
@@ -222,7 +250,6 @@ def test_recursive_algorithms_handle_long_paths(aid):
             "max_events", "max_expanded_nodes", "max_generated_nodes")
     else:
         assert result.found and len(result.path) == 1280
-    assert result.termination_reason != TerminationReason.INTERRUPTED
 
 
 def test_recursion_limit_is_restored_after_run():

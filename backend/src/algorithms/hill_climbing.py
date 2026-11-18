@@ -35,10 +35,9 @@ class HillClimbing(BaseSearch):
         self,
         problem: SearchProblem,
         budget: Optional[SearchBudget] = None,
-        env=None,
         sideways_moves: int = 0,
     ) -> None:
-        super().__init__(problem, budget=budget, env=env)
+        super().__init__(problem, budget=budget)
         if sideways_moves < 0:
             raise ValueError("sideways_moves must be >= 0")
         self.sideways_moves = sideways_moves
@@ -69,13 +68,14 @@ class HillClimbing(BaseSearch):
         path: List[Cell] = [start]
         came_from: Dict[Cell, Optional[Cell]] = {start: None}
         self._nodes_generated = 1
+        self._note_frontier(1)
         sideways_used = 0
         plateau_visited: Set[Cell] = {start}
 
         while True:
             self._check_budget()
             depth = len(path) - 1
-            self._nodes_explored += 1
+            self._count_expansion()
             self._search_depth = depth
 
             self._emit(EventType.NODE_EXPANDED, current,
@@ -100,7 +100,7 @@ class HillClimbing(BaseSearch):
 
             evaluated = []
             for nxt, action in neighbors:
-                self._nodes_generated += 1
+                self._count_generation()
                 nh = problem.h(nxt)
                 evaluated.append((nh, nxt.row, nxt.col, nxt, action))
                 self._emit(EventType.NODE_DISCOVERED, nxt, parent=current,

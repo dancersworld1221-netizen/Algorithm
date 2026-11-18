@@ -53,7 +53,7 @@ beam_search, rbfs
   but the Worker was not run end to end; see README "Verification status".
 
 ## Phase 7 — QA (pending)
-- Backend: 235 passed. Frontend: 32 passed (vitest)
+- Backend: 476 passed. Frontend: 32 passed (vitest) + 6 end-to-end UI tests
 - Frontend production build: OK
 - Cloudflare deployment verification: pending (requires Cloudflare credentials)
 
@@ -67,3 +67,12 @@ enforced and limit reasons were lost, exceptions were swallowed as
 "interrupted", server limits in `wrangler.jsonc` were never read, defaults for
 rows/cols were swapped, and the frontend could not parse the backend's cell
 format (so the animation never rendered) nor size its grid cells.
+
+## Second audit (algorithms)
+
+Exact budgets (N allows exactly N expansions), a 1e-9 cost tolerance so sums of
+sqrt(2) never reopen nodes, honest `max_frontier_size` for IDA*/RBFS, consistent
+terminal events, `max_events` truncates the trace instead of aborting the search
+(IDDFS on the default grid: 45% -> 100% solved), no more squeezing between two
+diagonal walls, Greedy's completeness stated correctly, memoised successors,
+and property tests that validate algorithm behaviour rather than only answers.

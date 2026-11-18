@@ -58,13 +58,14 @@ class BFS(BaseSearch):
         g_score: Dict[Cell, float] = {start: 0.0}
         discovered: set[Cell] = {start}
         self._nodes_generated = 1
+        self._note_frontier(1)
 
         depth_of: Dict[Cell, int] = {start: 0}
 
         while queue:
             self._check_budget()
             current = queue.popleft()
-            self._nodes_explored += 1
+            self._count_expansion()
             self._search_depth = max(self._search_depth, depth_of[current])
 
             self._emit(EventType.NODE_REMOVED_FROM_FRONTIER, current,
@@ -97,7 +98,7 @@ class BFS(BaseSearch):
                 came_from[nxt] = current
                 g_score[nxt] = g_score[current] + action.cost
                 depth_of[nxt] = depth_of[current] + 1
-                self._nodes_generated += 1
+                self._count_generation()
                 self._max_frontier_size = max(
                     self._max_frontier_size, len(queue) + 1
                 )

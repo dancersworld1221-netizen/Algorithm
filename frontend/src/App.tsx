@@ -172,11 +172,9 @@ export default function App() {
   }, [algorithms, env, options, inputSignature]);
 
   const selected = algorithms.find((a) => a.id === algorithm);
-  const limitNote =
-    run?.result.termination_reason === "limit_reached" &&
-    run.result.limit_reason === "max_events"
-      ? "The event budget ended this run, so the animation is truncated."
-      : null;
+  const limitNote = run?.result.trace_truncated
+    ? `The search finished, but its trace was longer than ${run.result.events.length.toLocaleString()} events, so the animation shows only the first part and then the result.`
+    : null;
 
   return (
     <div className="min-h-screen">

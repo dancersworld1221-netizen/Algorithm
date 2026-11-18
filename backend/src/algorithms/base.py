@@ -13,7 +13,6 @@ import time
 from dataclasses import dataclass
 from typing import Dict, Iterator, List, Optional, Tuple
 
-from ..core.grid import GridEnvironment
 from ..core.problem import (
     Action,
     Cell,
@@ -24,6 +23,18 @@ from ..core.problem import (
     TerminationReason,
 )
 
+
+# Events that always end a trace, even when the trace is otherwise full.
+_CONCLUDING_EVENTS = frozenset({
+    EventType.PATH_FOUND,
+    EventType.SEARCH_FAILED,
+    EventType.EXECUTION_LIMIT_REACHED,
+})
+
+# Costs are sums of floats (e.g. several sqrt(2) diagonals), so two equal-cost
+# routes can differ by ~1e-15. Cost comparisons use this tolerance so such noise
+# is never mistaken for a cheaper route (which would re-expand nodes).
+COST_EPS = 1e-9
 
 # Enough for a path through every cell of the largest allowed grid.
 RECURSION_LIMIT = 12000
@@ -123,11 +134,9 @@ class BaseSearch:
         self,
         problem: SearchProblem,
         budget: Optional[SearchBudget] = None,
-        env: Optional[GridEnvironment] = None,
     ) -> None:
         self.problem = problem
         self.budget = budget or SearchBudget()
-        self.env = env
 
         self._events: List[SearchEvent] = []
         self._seq = 0
@@ -139,6 +148,7 @@ class BaseSearch:
         self._search_depth = 0
         self._termination_reason = TerminationReason.NO_PATH
         self._limit_reason: Optional[str] = None
+        self._trace_truncated = False
         # Instance-level outcome holders (initialized per run). Using plain
         # attributes here: field() only works inside @dataclass classes, and
         # BaseSearch is not a dataclass.
@@ -158,12 +168,16 @@ class BaseSearch:
         h: Optional[float] = None,
         f: Optional[float] = None,
         metadata: Optional[Dict[str, object]] = None,
-        force: bool = False,
     ) -> None:
-        # ``force`` lets the terminal limit event through even when the event
-        # budget is what ended the search.
-        if not force and len(self._events) >= self.budget.max_events:
-            raise SearchBudgetExceeded("max_events")
+        # ``max_events`` bounds the size of the recorded trace, not the
+        # search: once it is full, intermediate events are dropped and the
+        # search carries on to its real outcome (still bounded by the
+        # expanded / generated / time budgets). The events that conclude a
+        # search are always recorded, so every trace ends consistently.
+        if (len(self._events) >= self.budget.max_events
+                and type not in _CONCLUDING_EVENTS):
+            self._trace_truncated = True
+            return
         self._seq += 1
         self._events.append(
             SearchEvent(
@@ -182,14 +196,31 @@ class BaseSearch:
     # -- budget checks ----------------------------------------------------
 
     def _check_budget(self) -> None:
+        """Time budget; call regularly from the search loop."""
         if self._end_time is None and self._start_time is not None:
             elapsed_ms = (now_ms() - self._start_time)
             if elapsed_ms > self.budget.timeout_ms:
                 raise SearchBudgetExceeded("timeout")
-        if self._nodes_generated > self.budget.max_generated_nodes:
-            raise SearchBudgetExceeded("max_generated_nodes")
-        if self._nodes_explored > self.budget.max_expanded_nodes:
+
+    def _count_expansion(self) -> None:
+        """Count one node expansion, refusing the (max+1)-th one.
+
+        A budget of N therefore allows exactly N expansions.
+        """
+        if self._nodes_explored >= self.budget.max_expanded_nodes:
             raise SearchBudgetExceeded("max_expanded_nodes")
+        self._nodes_explored += 1
+
+    def _count_generation(self) -> None:
+        """Count one generated node (a frontier insertion), same rule."""
+        if self._nodes_generated >= self.budget.max_generated_nodes:
+            raise SearchBudgetExceeded("max_generated_nodes")
+        self._nodes_generated += 1
+
+    def _note_frontier(self, size: int) -> None:
+        """Record the peak number of nodes held in the open structure."""
+        if size > self._max_frontier_size:
+            self._max_frontier_size = size
 
     # -- template ---------------------------------------------------------
 
@@ -203,6 +234,7 @@ class BaseSearch:
         self._start_time = now_ms()
         self._termination_reason = TerminationReason.NO_PATH
         self._limit_reason = None
+        self._trace_truncated = False
         self._found = False
         self._path = []
         self._path_cost = 0.0
@@ -250,14 +282,19 @@ class BaseSearch:
             termination_reason=self._termination_reason,
             algorithm=self.algorithm_id,
             limit_reason=self._limit_reason,
+            trace_truncated=self._trace_truncated,
         )
 
-    def _mark_limit(self, reason: str) -> None:
-        """Record a budget stop and emit the terminal limit event."""
+    def _mark_limit(self, reason: str, **metadata: object) -> None:
+        """Record a limit stop and emit the terminal limit event.
+
+        Used for budget exhaustion and for algorithm-level limits (a depth
+        cutoff), so every ``limit_reached`` result ends the same way.
+        """
         self._termination_reason = TerminationReason.LIMIT_REACHED
         self._limit_reason = reason
         self._emit(EventType.EXECUTION_LIMIT_REACHED, self.problem.start,
-                   metadata={"reason": reason}, force=True)
+                   metadata={"reason": reason, **metadata})
 
     def _search(self) -> None:
         raise NotImplementedError

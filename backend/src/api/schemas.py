@@ -55,6 +55,7 @@ class SearchResultDTO(BaseModel):
     termination_reason: str
     algorithm: str
     limit_reason: Optional[str] = None
+    trace_truncated: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -105,7 +106,8 @@ class AlgorithmsListDTO(BaseModel):
 
 class SearchExecuteRequest(EnvironmentFields, AlgorithmOptions):
     algorithm: str = Field(..., description="algorithm id, e.g. 'astar'")
-    # Execution budget overrides (clamped to the server-side maximums).
+    # Budget overrides (clamped to the server-side maximums). ``max_events``
+    # caps the size of the recorded trace; it never changes the search result.
     max_expanded_nodes: Optional[int] = Field(None, ge=1)
     max_generated_nodes: Optional[int] = Field(None, ge=1)
     max_events: Optional[int] = Field(None, ge=1)

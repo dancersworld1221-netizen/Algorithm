@@ -2,7 +2,6 @@
 const LIMIT_TEXT: Record<string, string> = {
   max_expanded_nodes: "expanded-node budget exhausted",
   max_generated_nodes: "generated-node budget exhausted",
-  max_events: "event budget exhausted",
   timeout: "time budget exhausted",
   depth_limit: "depth limit reached (cutoff)",
   max_depth: "maximum iterative-deepening depth reached",

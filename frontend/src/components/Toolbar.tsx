@@ -68,7 +68,7 @@ export function Toolbar({ config, disabled }: ToolbarProps) {
           className={`flex items-center gap-2 pb-2 ${
             env.movement === "eight_way" ? "" : "opacity-40"
           }`}
-          title="Allow diagonal moves that pass between two touching walls"
+          title="Allow a diagonal move to graze the corner of one wall. It still cannot squeeze between two walls."
         >
           <input
             type="checkbox"

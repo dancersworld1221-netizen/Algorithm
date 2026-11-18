@@ -82,10 +82,10 @@ ALGORITHM_METADATA: dict[str, dict] = {
     "greedy": {
         "name": "Greedy Best-First Search",
         "abbreviation": "GBFS",
-        "description": "Prioritizes by h(n) only. Fast but neither complete nor optimal.",
+        "description": "Prioritizes by h(n) only, with an expanded set. Fast but not optimal.",
         "data_structure": "min-priority queue (by h)",
         "optimal": "no",
-        "complete": "no",
+        "complete": "finite graphs (closed set)",
     },
     "ida_star": {
         "name": "Iterative Deepening A*",

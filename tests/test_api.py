@@ -283,3 +283,20 @@ def test_validate_path_endpoint_rejects_bad_environment():
     response = client.post("/api/search/validate-path",
                            json={**BASE, "start": {"row": 9, "col": 9}})
     assert_error_shape(response, 400, "invalid_request")
+
+
+def test_event_cap_is_reported_as_trace_truncation_not_failure():
+    result = post(max_events=5).json()["result"]
+    assert result["found"] is True
+    assert result["trace_truncated"] is True
+    assert result["limit_reason"] is None
+    assert result["events"][-1]["type"] == "PATH_FOUND"
+
+
+def test_comparison_is_not_limited_by_the_trace_size():
+    base = {k: v for k, v in BASE.items() if k != "algorithm"}
+    body = client.post("/api/comparisons", json={
+        **base, "rows": 15, "cols": 20, "goal": {"row": 14, "col": 19},
+        "algorithms": ["iddfs", "rbfs", "bfs"], "iddfs_max_depth": 60,
+    }).json()
+    assert all(r["limit_reason"] != "max_events" for r in body["results"])

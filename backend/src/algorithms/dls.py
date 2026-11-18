@@ -34,10 +34,9 @@ class DLS(BaseSearch):
         self,
         problem: SearchProblem,
         budget: Optional[SearchBudget] = None,
-        env=None,
         limit: int = 0,
     ) -> None:
-        super().__init__(problem, budget=budget, env=env)
+        super().__init__(problem, budget=budget)
         if limit < 0:
             raise ValueError("depth limit must be >= 0")
         self.limit = limit
@@ -73,6 +72,7 @@ class DLS(BaseSearch):
         self._nodes_generated = 1
         self._max_frontier_size = 1
         cutoff_occurred = False
+        cut_marked: set = set()
 
         while stack:
             self._check_budget()
@@ -82,7 +82,7 @@ class DLS(BaseSearch):
 
             if not frame.expanded:
                 frame.expanded = True
-                self._nodes_explored += 1
+                self._count_expansion()
                 self._search_depth = max(self._search_depth, depth)
                 self._emit(EventType.NODE_REMOVED_FROM_FRONTIER, current,
                            parent=came_from[current], depth=depth, g=g, h=h,
@@ -113,6 +113,9 @@ class DLS(BaseSearch):
                         # A never-reached state is being skipped only because
                         # of the limit: a genuine cutoff.
                         cutoff_occurred = True
+                        if nxt in cut_marked:
+                            continue  # one marker per cell is enough
+                        cut_marked.add(nxt)
                         self._emit(EventType.CUTOFF, nxt, parent=current,
                                    depth=next_depth, g=ng, h=problem.h(nxt),
                                    f=ng + problem.h(nxt),
@@ -123,7 +126,7 @@ class DLS(BaseSearch):
                     continue
                 best_depth[nxt] = next_depth
                 came_from[nxt] = current
-                self._nodes_generated += 1
+                self._count_generation()
                 nh = problem.h(nxt)
                 self._emit(EventType.NODE_DISCOVERED, nxt, parent=current,
                            depth=next_depth, g=ng, h=nh, f=ng + nh,
@@ -144,10 +147,7 @@ class DLS(BaseSearch):
                 stack.pop()
 
         if cutoff_occurred:
-            self._termination_reason = TerminationReason.LIMIT_REACHED
-            self._limit_reason = "depth_limit"
-            self._emit(EventType.SEARCH_FAILED, start, depth=0,
-                       metadata={"reason": "cutoff", "limit": limit})
+            self._mark_limit("depth_limit", limit=limit)
         else:
             self._termination_reason = TerminationReason.NO_PATH
             self._emit(EventType.SEARCH_FAILED, start, depth=0,

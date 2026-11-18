@@ -60,7 +60,7 @@ class DFS(BaseSearch):
 
             if not frame.expanded:
                 frame.expanded = True
-                self._nodes_explored += 1
+                self._count_expansion()
                 self._search_depth = max(self._search_depth, depth)
                 self._emit(EventType.NODE_REMOVED_FROM_FRONTIER, current,
                            parent=came_from[current], depth=depth, g=g,
@@ -88,7 +88,7 @@ class DFS(BaseSearch):
                     continue
                 visited.add(nxt)
                 came_from[nxt] = current
-                self._nodes_generated += 1
+                self._count_generation()
                 ng = g + action.cost
                 nh = problem.h(nxt)
                 self._emit(EventType.NODE_DISCOVERED, nxt, parent=current,

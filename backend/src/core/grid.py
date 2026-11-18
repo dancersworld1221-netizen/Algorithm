@@ -72,23 +72,28 @@ class GridEnvironment:
     def _diagonal_corner_blocked(
         self, from_cell: Cell, to_cell: Cell
     ) -> bool:
-        """True if a diagonal move cuts through a blocked corner.
+        """True if a diagonal move is forbidden by the corner policy.
 
-        For a diagonal move from (r,c) to (r+dr, c+dc), the two adjacent
-        orthogonal cells must both be free (or in-bounds and non-obstacle)
-        unless corner cutting is enabled.
+        A diagonal from (r,c) to (r+dr, c+dc) passes the two orthogonal
+        "side" cells (r+dr, c) and (r, c+dc):
+
+        - corner_cutting = False: both sides must be free (the agent may not
+          touch any wall corner).
+        - corner_cutting = True: the agent may graze the corner of ONE wall,
+          but never squeeze through the zero-width gap between two walls that
+          touch diagonally.
+
+        The side cells always lie inside the bounding box of the two cells,
+        so they are in bounds whenever the move itself is.
         """
-        if self.config.corner_cutting:
-            return False
         dr = to_cell.row - from_cell.row
         dc = to_cell.col - from_cell.col
         if abs(dr) != 1 or abs(dc) != 1:
             return False
-        side1 = Cell(from_cell.row + dr, from_cell.col)
-        side2 = Cell(from_cell.row, from_cell.col + dc)
-        # A side cell is blocking if it's out of bounds or an obstacle.
-        blocked1 = (not self.in_bounds(side1)) or self.is_obstacle(side1)
-        blocked2 = (not self.in_bounds(side2)) or self.is_obstacle(side2)
+        blocked1 = self.is_obstacle(Cell(from_cell.row + dr, from_cell.col))
+        blocked2 = self.is_obstacle(Cell(from_cell.row, from_cell.col + dc))
+        if self.config.corner_cutting:
+            return blocked1 and blocked2
         return blocked1 or blocked2
 
     def successors(self, cell: Cell) -> List[Tuple[Cell, Action]]:
@@ -168,8 +173,17 @@ def build_problem(
     for obs in config.obstacles:
         env.add_obstacle(obs)
 
+    # The environment is immutable once built, so successor lists can be
+    # memoised. This matters for the iterative algorithms (IDDFS, IDA*, RBFS),
+    # which revisit the same cells many times. Callers get a fresh list.
+    cache: dict = {}
+
     def successors(state: Cell) -> List[Tuple[Cell, Action]]:
-        return env.successors(state)
+        cached = cache.get(state)
+        if cached is None:
+            cached = tuple(env.successors(state))
+            cache[state] = cached
+        return list(cached)
 
     def goal_test(state: Cell) -> bool:
         return state == goal

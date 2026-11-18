@@ -45,9 +45,8 @@ class IDAStar(BaseSearch):
         self,
         problem: SearchProblem,
         budget: Optional[SearchBudget] = None,
-        env=None,
     ) -> None:
-        super().__init__(problem, budget=budget, env=env)
+        super().__init__(problem, budget=budget)
         self._path_stack: List[Cell] = []
         self._best_g: Dict[Cell, float] = {}
 
@@ -149,7 +148,8 @@ class IDAStar(BaseSearch):
         self._best_g[current] = g
 
         self._check_budget()
-        self._nodes_explored += 1
+        self._count_expansion()
+        self._note_frontier(len(self._path_stack))
         self._search_depth = max(self._search_depth, depth)
         self._emit(EventType.NODE_EXPANDED, current, parent=parent,
                    depth=depth, g=g, h=h, f=f,
@@ -165,7 +165,7 @@ class IDAStar(BaseSearch):
             self._check_budget()
             ng = g + action.cost
             nh = problem.h(nxt)
-            self._nodes_generated += 1
+            self._count_generation()
             self._emit(EventType.NODE_DISCOVERED, nxt, parent=current,
                        depth=depth + 1, g=ng, h=nh, f=ng + nh,
                        metadata={"action": action.label})

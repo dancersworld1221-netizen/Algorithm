@@ -39,6 +39,8 @@ export interface SearchResultDTO {
   termination_reason: string;
   algorithm: string;
   limit_reason: string | null;
+  /** The trace hit the server's event cap; the search itself was not cut. */
+  trace_truncated: boolean;
 }
 
 export interface AlgorithmDTO {

@@ -34,10 +34,9 @@ class BeamSearch(BaseSearch):
         self,
         problem: SearchProblem,
         budget: Optional[SearchBudget] = None,
-        env=None,
         beam_width: int = 3,
     ) -> None:
-        super().__init__(problem, budget=budget, env=env)
+        super().__init__(problem, budget=budget)
         if beam_width < 1:
             raise ValueError("beam_width must be >= 1")
         self.beam_width = beam_width
@@ -81,7 +80,7 @@ class BeamSearch(BaseSearch):
                 g = g_score[current]
                 depth = level - 1
                 h = problem.h(current)
-                self._nodes_explored += 1
+                self._count_expansion()
                 self._search_depth = max(self._search_depth, depth)
                 self._emit(EventType.NODE_EXPANDED, current,
                            parent=came_from[current], depth=depth, g=g, h=h,
@@ -107,7 +106,7 @@ class BeamSearch(BaseSearch):
                         continue
                     ng = g + action.cost
                     nh = problem.h(nxt)
-                    self._nodes_generated += 1
+                    self._count_generation()
                     rank = (nh, ng, nxt.row, nxt.col)
                     self._emit(EventType.NODE_DISCOVERED, nxt, parent=current,
                                depth=level, g=ng, h=nh, f=ng + nh,
